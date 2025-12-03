@@ -1,6 +1,8 @@
 package dev.cypdashuhn.aoc25.d3
 
 import dev.cypdashuhn.aoc25.getLines
+import java.math.BigInteger
+import kotlin.math.pow
 
 data class Bank(
     val batteryJoltages: List<Int>
@@ -16,8 +18,11 @@ data class Bank(
 fun getBanks() = getLines(3, "input").map(Bank::fromString)
 
 fun main() {
-    val res = getBanks().sumOf { calc1(it) }
-    println(res)
+    val res1 = getBanks().sumOf { calc1(it) }
+    println(res1)
+
+    val res2 = getBanks().sumOf { calc2(it) }
+    println(res2)
 }
 
 fun calc1(bank: Bank): Int {
@@ -33,6 +38,33 @@ fun calc1(bank: Bank): Int {
     throw IllegalStateException("shouldnt hit")
 }
 
-fun calc2(bank: Bank): Int {
+fun calc2(bank: Bank): BigInteger {
+    var scope = bank.batteryJoltages
+    var currentJoltage = 0.toBigInteger()
+    (1..12).sortedDescending().forEach { i ->
+        val res = nextScope(scope, i)
+        scope = res.listLeft
 
+        val mod = (10.0.pow((i-1).toDouble())).toBigDecimal().toBigInteger()
+        val valueAtPosition = res.res.toBigInteger() * mod
+        currentJoltage += valueAtPosition
+    }
+
+    return currentJoltage
+}
+
+data class ScopeResult(
+    val res: Int,
+    val listLeft: List<Int>
+)
+
+fun nextScope(list: List<Int>, digitsLeft: Int): ScopeResult {
+    val indexed = list.withIndex()
+    val length = list.count()
+
+    val possibleOptions = indexed.filter { it.index <= length - digitsLeft }
+    val highest = possibleOptions.maxBy { it.value }
+
+    val listLeft = indexed.filter { it.index > highest.index }.map { it.value }
+    return ScopeResult(highest.value, listLeft)
 }
