@@ -5,15 +5,7 @@ import dev.cypdashuhn.aoc25.getLinesStream
 fun LongRange.longCount(): Long {
     return this.endInclusive - this.start + 1
 }
-fun LongRange.intersects(long: Long): Boolean {
-    val afterFirst = this.start <= long
-    val beforeLast = this.endInclusive >= long
-    val inRange = afterFirst && beforeLast
-
-    println("comparing $this to $long. Res: afterFirst: $afterFirst, beforeLast: $beforeLast, inRange: $inRange")
-
-    return inRange
-}
+fun LongRange.intersects(long: Long) = this.start <= long && this.endInclusive >= long
 
 fun main() {
     var range = 3..5
@@ -65,44 +57,48 @@ fun calc2() {
     println(count)
 }
 
+data class Comparison(
+    val range: LongRange,
+    val leftIntersected: Boolean,
+    val rightIntersected: Boolean,
+    val completeOverlap: Boolean
+) {
+    companion object {
+        fun compare(r: LongRange, r2: LongRange): Comparison {
+            val completeOverlap = r.start <= r2.start && r.endInclusive >= r2.endInclusive
+            val leftIntersected = r2.intersects(r.endInclusive)
+            val rightIntersected = r2.intersects(r.start)
+            return Comparison(r, leftIntersected, rightIntersected, completeOverlap)
+        }
+    }
+}
+
 fun calc3() {
     val data = getStuff()
 
     val sortedRanges = data.freshRanges.sortedWith(compareBy({it.first }, { it.last })).toSet()
 
+    val bruteforce = sortedRanges.flatMap { it.toList() }.toSet()
+
     val cutRanges = mutableListOf<LongRange>()
     sortedRanges.withIndex().forEach { (idx, range) ->
-        println("---")
-        println(idx)
-        println(range)
-        if (idx > 165) {
-            println("-")
-        }
-        val overlaps = cutRanges.map { cr ->
-            cr to (range.intersects(cr.start) to range.intersects(cr.endInclusive))
-        }
-        println("found: ${overlaps.count()}")
-        val highestEnd = overlaps.filter { it.second.second }.maxOfOrNull { it.first.endInclusive }
-        val lowestStart = overlaps.filter { it.second.first }.minOfOrNull { it.first.start }
+        val overlapping = cutRanges.map { Comparison.compare(it, range) }
+        if (overlapping.any { it.completeOverlap }) return@forEach
+        val highestEnd = overlapping.filter { it.leftIntersected }.maxOfOrNull { it.range.endInclusive }
+        val lowestStart = overlapping.filter { it.rightIntersected }.maxOfOrNull { it.range.start }
 
-        println("intersecting end: $highestEnd")
-        println("intersecting low: $lowestStart")
-
-        if (highestEnd != null && lowestStart != null && highestEnd >= lowestStart) {
-            return@forEach}
-        if (highestEnd != null && highestEnd >= range.endInclusive) {
-            return@forEach}
-        if (lowestStart != null && lowestStart <= range.start ) {
-            return@forEach}
+        if (highestEnd != null && lowestStart != null && lowestStart >= highestEnd) return@forEach
 
         var start = range.start
         var end = range.endInclusive
-        if (highestEnd != null && highestEnd >= range.start) {
-            start = highestEnd + 1
+        if (highestEnd != null) {
+            if (highestEnd == range.endInclusive) { return@forEach }
+            if (highestEnd >= range.start) start = highestEnd + 1
+        } else if (lowestStart != null) {
+            if (lowestStart == range.start) { return@forEach }
+            if (lowestStart <= range.endInclusive) end = lowestStart - 1
         }
-        if (lowestStart != null && lowestStart <= range.endInclusive) {
-            end = lowestStart - 1
-        }
+
         if (start > end) return@forEach
         cutRanges += start .. end
     }
@@ -116,6 +112,9 @@ fun calc3() {
     cutRanges.forEach {
         count += it.longCount()
     }
+
+    val ordered = cutRanges.sortedWith(compareBy({it.start}, {it.endInclusive}))
+
     println(count)
 }
 
@@ -128,7 +127,7 @@ fun getStuff(): Data {
     val freshRanges = mutableListOf<LongRange>()
     val items = mutableListOf<Long>()
     var isSecond = false;
-    getLinesStream(5, "input").forEach { s ->
+    getLinesStream(5, "test").forEach { s ->
         if (s.trim() == "") isSecond = true;
         else if (!isSecond) {
             val (first, second) = s.split("-")
