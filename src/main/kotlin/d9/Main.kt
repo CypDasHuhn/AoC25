@@ -71,19 +71,6 @@ fun main() {
         println()
     }
     println("---")
-    /*
- 0-3
- 0-5
- 1-1
- 1-3
- 2-5
- 2-7
- 3-1
- 3-7
-
-     */
-
-
     val shrinkedKeys = shrinkedGrid.keys.toList()
     shrinkedGrid.clear()
     val yToPickUp = mutableListOf<ShrinkedPos>()
