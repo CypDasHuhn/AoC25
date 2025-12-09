@@ -1,39 +1,150 @@
 package dev.cypdashuhn.aoc25.d9
 
 import dev.cypdashuhn.aoc25.getLines
-import kotlin.math.absoluteValue
 
-fun getInts() = getLines(9, "input").map { it.split(",").map { it.toInt() } }.map { it[0] to it[1] }
-
-data class Boundary <T> (
-    val idx1: Int,
-    val idx2: Int,
-    val p1: T,
-    val p2: T
+enum class State {
+    RED,
+    GREEN,
+    EMPTY
+}
+data class Pos(
+    val x: Long,
+    val y: Long,
+) {
+    companion object {
+        fun fromString(s: String): Pos {
+            val (x, y) = s.split(",")
+            return Pos(x.toLong(), y.toLong())
+        }
+    }
+}
+data class ShrinkedPos(
+    val localPos: Pos,
+    val jump: Pos
 )
+fun getGrid() = getLines(9, "test").map(Pos::fromString).associateWith { State.RED }
 
 fun main() {
-    val ints = getInts().withIndex()
+    val grid = getGrid()
+    val keys = getLines(9, "test").map(Pos::fromString)
+    val shrinkedGrid = mutableMapOf<ShrinkedPos, State>()
+    val xStart = keys.minOf { it.x }
+    val yStart = keys.minOf { it.y }
 
-    val o1 = ints.flatMap { (idx, pair) -> ints.filter { it.index < idx }.map { Boundary(idx, it.index, pair, it.value) }}
-    val o2 = o1.map {
-        val x = (it.p2.first - it.p1.first).absoluteValue.toLong() + 1
-        val y = (it.p2.second - it.p1.second).absoluteValue.toLong() + 1
-        Boundary(it.idx1, it.idx2, x, y)
+    val toPickUp = mutableListOf<Pos>()
+    keys
+        .sortedBy { it.x }
+        .zipWithNext()
+        .withIndex()
+        .forEach { (idx, nums) ->
+            val (prev, next) = nums
+            val isLast = idx == keys.count() - 2
+
+            val xDiff = next.x - prev.x
+
+            fun add(jump: Long) {
+                val highestX = shrinkedGrid.keys.maxOfOrNull { it.localPos.x } ?: -1
+                toPickUp.forEach {
+                    shrinkedGrid[ShrinkedPos(Pos(highestX + 1, it.y), Pos(jump, 0))] = State.RED
+                }
+                toPickUp.clear()
+            }
+
+            if (xDiff == 0.toLong()) toPickUp += prev
+            else {
+                toPickUp += prev
+                add(xDiff)
+            }
+
+            if (isLast) {
+                toPickUp += next
+                add(0)
+            }
+        }
+
+    (0..shrinkedGrid.maxOf { it.key.localPos.x }).forEach { x ->
+        (0..shrinkedGrid.maxOf { it.key.localPos.y }).forEach { y ->
+            val state = shrinkedGrid.filter { it.key.localPos == Pos(x.toLong(), y.toLong()) }.map { it.value }.firstOrNull()
+            if (state == null) print(" ")
+            else print("#")
+        }
+        println()
     }
-    val o3 = o2.map { it.p1 * it.p2 }
-    val o4 = o3.sortedDescending()
+    println("---")
+    /*
+ 0-3
+ 0-5
+ 1-1
+ 1-3
+ 2-5
+ 2-7
+ 3-1
+ 3-7
 
-    // 11 - 2 = 9 ; 7 - 3 = 4; 10 * 5 = 50
-    // 11 - 2 = 9 ; 5 - 1 = 4; 10 * 5 = 50
+     */
 
-    val e = ints.flatMap { (idx, pair) ->
-        ints.filter { it.index < idx }.map { pair to it.value }
-    }.map {
-        val x = (it.first.first - it.second.first).absoluteValue.toLong() + 1
-        val y = (it.first.second - it.second.second).absoluteValue.toLong() + 1
-        x * y
-    }.sortedDescending()
-    val r = e.max()
-    println(r)
+
+    val shrinkedKeys = shrinkedGrid.keys.toList()
+    shrinkedGrid.clear()
+    val yToPickUp = mutableListOf<ShrinkedPos>()
+    shrinkedKeys.sortedBy { it.localPos.y }.zipWithNext().withIndex().forEach { (idx, nums) ->
+        val (prevP, nextP) = nums
+        val (prev, prevJump) = prevP
+        val (next, nextJump) = nextP
+        val isLast = idx == keys.count() - 2
+
+        val yDiff = next.y - prev.y
+
+        fun add(jumpY: Long) {
+            val highestY = shrinkedGrid.keys.maxOfOrNull { it.localPos.y } ?: -1
+            yToPickUp.forEach { (pos, jump) ->
+                shrinkedGrid[ShrinkedPos(Pos(pos.x, highestY + 1), Pos(jump.x, jumpY))] = State.RED
+            }
+            yToPickUp.clear()
+        }
+
+        if (yDiff == 0.toLong()) yToPickUp += prevP
+        else {
+            yToPickUp += prevP
+            add(yDiff)
+        }
+
+        if (isLast) {
+            yToPickUp += nextP
+            add(0)
+        }
+    }
+
+    (0..shrinkedGrid.maxOf { it.key.localPos.x }).forEach { x ->
+        (0..shrinkedGrid.maxOf { it.key.localPos.y }).forEach { y ->
+            val state = shrinkedGrid.filter { it.key.localPos == Pos(x.toLong(), y.toLong()) }.map { it.value }.firstOrNull()
+            if (state == null) print(" ")
+            else print("#")
+        }
+        println()
+    }
+
+    println("lol")
 }
+
+/*
+ 0-3
+ 0-5
+ 1-1
+ 1-3
+ 2-5
+ 2-7
+ 3-1
+ 3-7
+
+
+0-1
+0-2
+1-0
+1-1
+2-2
+2-3
+3-0
+3-3
+
+ */
