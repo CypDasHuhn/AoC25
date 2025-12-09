@@ -23,9 +23,9 @@ fun calc1() {
 fun calc2() {
     val grid = getGrid()
     val rows = grid.toRows()
-    val strangifiedRows = rows.map { row -> Row(row.numbers.strangify(), row.operator) }
+    /*val strangifiedRows = rows.map { row -> Row(row.numbers.strangify(), row.operator) }
     val sum = strangifiedRows.resultSum()
-    println(sum)
+    println(sum)*/
 }
 
 fun getGrid() = Grid.fromList(getLines(6, "test"))
