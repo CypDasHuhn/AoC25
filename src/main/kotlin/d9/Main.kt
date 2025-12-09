@@ -22,116 +22,84 @@ data class ShrinkedPos(
     val localPos: Pos,
     val jump: Pos
 )
-fun getGrid() = getLines(9, "test").map(Pos::fromString).associateWith { State.RED }
 
 fun main() {
-    val grid = getGrid()
-    val keys = getLines(9, "test").map(Pos::fromString)
-    val shrinkedGrid = mutableMapOf<ShrinkedPos, State>()
-    val xStart = keys.minOf { it.x }
-    val yStart = keys.minOf { it.y }
+    val keys = getLines(9, "input").map(Pos::fromString)
 
-    val toPickUp = mutableListOf<Pos>()
-    keys
-        .sortedBy { it.x }
+    // First pass: shrink by X
+    val xShrinked = shrinkByAxis(
+        items = keys,
+        sortBy = { it.x },
+        { it.localPos.x },
+        getOtherCoord = { it.y },
+        getDiff = { prev, next -> next.x - prev.x },
+        createShrinkedPos = { localX, y, jumpX -> ShrinkedPos(Pos(localX, y), Pos(jumpX, 0)) }
+    )
+
+    // Second pass: shrink by Y
+    val yShrinked = shrinkByAxis(
+        items = xShrinked.keys.toList(),
+        sortBy = { it.localPos.y },
+        { it.localPos.y },
+        getOtherCoord = { it },
+        getDiff = { prev, next -> next.localPos.y - prev.localPos.y },
+        createShrinkedPos = { localY, shrinkedPos, jumpY ->
+            ShrinkedPos(Pos(shrinkedPos.localPos.x, localY), Pos(shrinkedPos.jump.x, jumpY))
+        }
+    )
+
+    printGrid(yShrinked)
+}
+
+fun <T, U> shrinkByAxis(
+    items: List<T>,
+    sortBy: (T) -> Long,
+    valueBy: (ShrinkedPos) -> Long,
+    getOtherCoord: (T) -> U,
+    getDiff: (T, T) -> Long,
+    createShrinkedPos: (localCoord: Long, otherData: U, jump: Long) -> ShrinkedPos
+): MutableMap<ShrinkedPos, State> {
+    val result = mutableMapOf<ShrinkedPos, State>()
+    val buffer = mutableListOf<T>()
+
+    fun flush(jump: Long) {
+        val maxCoord = result.keys.maxOfOrNull(valueBy) ?: -1
+        buffer.forEach { item ->
+            result[createShrinkedPos(maxCoord + 1, getOtherCoord(item), jump)] = State.RED
+        }
+        buffer.clear()
+    }
+
+    items.sortedBy(sortBy)
         .zipWithNext()
-        .withIndex()
-        .forEach { (idx, nums) ->
-            val (prev, next) = nums
-            val isLast = idx == keys.count() - 2
+        .forEachIndexed { idx, (prev, next) ->
+            val diff = getDiff(prev, next)
+            val isLast = idx == items.size - 2
 
-            val xDiff = next.x - prev.x
+            buffer += prev
 
-            fun add(jump: Long) {
-                val highestX = shrinkedGrid.keys.maxOfOrNull { it.localPos.x } ?: -1
-                toPickUp.forEach {
-                    shrinkedGrid[ShrinkedPos(Pos(highestX + 1, it.y), Pos(jump, 0))] = State.RED
-                }
-                toPickUp.clear()
-            }
-
-            if (xDiff == 0.toLong()) toPickUp += prev
-            else {
-                toPickUp += prev
-                add(xDiff)
+            if (diff != 0L) {
+                flush(diff)
             }
 
             if (isLast) {
-                toPickUp += next
-                add(0)
+                buffer += next
+                flush(0)
             }
         }
 
-    (0..shrinkedGrid.maxOf { it.key.localPos.x }).forEach { x ->
-        (0..shrinkedGrid.maxOf { it.key.localPos.y }).forEach { y ->
-            val state = shrinkedGrid.filter { it.key.localPos == Pos(x.toLong(), y.toLong()) }.map { it.value }.firstOrNull()
-            if (state == null) print(" ")
-            else print("#")
-        }
-        println()
-    }
-    println("---")
-    val shrinkedKeys = shrinkedGrid.keys.toList()
-    shrinkedGrid.clear()
-    val yToPickUp = mutableListOf<ShrinkedPos>()
-    shrinkedKeys.sortedBy { it.localPos.y }.zipWithNext().withIndex().forEach { (idx, nums) ->
-        val (prevP, nextP) = nums
-        val (prev, prevJump) = prevP
-        val (next, nextJump) = nextP
-        val isLast = idx == keys.count() - 2
-
-        val yDiff = next.y - prev.y
-
-        fun add(jumpY: Long) {
-            val highestY = shrinkedGrid.keys.maxOfOrNull { it.localPos.y } ?: -1
-            yToPickUp.forEach { (pos, jump) ->
-                shrinkedGrid[ShrinkedPos(Pos(pos.x, highestY + 1), Pos(jump.x, jumpY))] = State.RED
-            }
-            yToPickUp.clear()
-        }
-
-        if (yDiff == 0.toLong()) yToPickUp += prevP
-        else {
-            yToPickUp += prevP
-            add(yDiff)
-        }
-
-        if (isLast) {
-            yToPickUp += nextP
-            add(0)
-        }
-    }
-
-    (0..shrinkedGrid.maxOf { it.key.localPos.x }).forEach { x ->
-        (0..shrinkedGrid.maxOf { it.key.localPos.y }).forEach { y ->
-            val state = shrinkedGrid.filter { it.key.localPos == Pos(x.toLong(), y.toLong()) }.map { it.value }.firstOrNull()
-            if (state == null) print(" ")
-            else print("#")
-        }
-        println()
-    }
-
-    println("lol")
+    return result
 }
 
-/*
- 0-3
- 0-5
- 1-1
- 1-3
- 2-5
- 2-7
- 3-1
- 3-7
+fun printGrid(grid: Map<ShrinkedPos, State>) {
+    val maxX = grid.maxOf { it.key.localPos.x }
+    val maxY = grid.maxOf { it.key.localPos.y }
 
-
-0-1
-0-2
-1-0
-1-1
-2-2
-2-3
-3-0
-3-3
-
- */
+    (0..maxY).forEach { y ->
+        (0..maxX).forEach { x ->
+            val hasCell = grid.keys.any { it.localPos == Pos(x, y) }
+            print(if (hasCell) "#" else " ")
+        }
+        println()
+    }
+}
