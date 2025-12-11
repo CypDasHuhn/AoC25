@@ -19,21 +19,28 @@ data class Device(
     val isYou by lazy { name == "you" }
     val isOut by lazy { name == "out" }
     val otherDevices by lazy { otherDeviceNames.map { d -> devices.first { d == it.name }} }
+    val isFft by lazy { name == "fft" }
+    val isDac by lazy { name == "dac" }
 }
 
 fun main() {
-    val first = devices.first { it.isYou }
+    val first = devices.first { it.name == "svr" }
     walk(first, listOf())
     println(endings)
 }
 
 var endings = 0
-fun walk(device: Device, devicesWalked: List<Device>) {
+fun walk(device: Device, devicesWalked: List<Device>, hasFFT: Boolean = false, hasDAC: Boolean = false) {
+    //println("walk ${device.name}")
     val interesting = device.otherDevices.filter { !devicesWalked.contains(it) }.toMutableList()
     if (interesting.any { it.isOut }) {
-        endings += 1
+        if (hasFFT && hasDAC) {
+            endings += 1
+        }
         interesting.removeIf { it.isOut }
     }
     val newWalked = devicesWalked + device
-    interesting.forEach { walk(it, newWalked) }
+    interesting.forEach {
+        walk(it, newWalked, hasFFT || it.isFft, hasDAC || it.isDac)
+    }
 }
